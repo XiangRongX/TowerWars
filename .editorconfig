@@ -1,0 +1,9 @@
+root = true
+
+# 针对 UE C++ 源码、头文件和 C# 脚本生效
+[*.{cpp,h,cs,inl}]
+charset = utf-8-bom
+indent_style = tab
+indent_size = 4
+end_of_line = crlf
+insert_final_newline = true

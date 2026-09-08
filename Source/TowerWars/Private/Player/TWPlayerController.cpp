@@ -1,0 +1,299 @@
+﻿// Fill out your copyright notice in the Description page of Project Settings.
+
+
+#include "Player/TWPlayerController.h"
+#include "Grid/TWGridSubsystem.h"
+#include "EnhancedInputSubsystems.h"
+#include "EnhancedInputComponent.h"
+#include "UI/TWHUD.h"
+#include "UI/TWOverlay.h"
+#include "Player/TWPlayerState.h"
+#include "Data/TowerDataAsset.h"
+#include "Data/EnemyDataAsset.h"
+#include "Tower/TWTowerBase.h"
+#include "Game/TWGameMode.h"
+
+void ATWPlayerController::PlayerTick(float DeltaTime)
+{
+	Super::PlayerTick(DeltaTime);
+
+    UTWGridSubsystem* GridSubsystem = GetWorld()->GetSubsystem<UTWGridSubsystem>();
+    if (!GridSubsystem) return;
+
+    // 2. 鼠标射线检测地面
+    FHitResult HitResult;
+    GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
+
+    if (HitResult.bBlockingHit)
+    {
+        // 3. 换算为网格坐标，并获取该格子的中心点坐标
+        FIntPoint HoveredCoord = GridSubsystem->WorldToGridCoords(HitResult.ImpactPoint);
+        FVector TileCenter = GridSubsystem->GridToWorldLocation(HoveredCoord);
+
+        // 4. 判定本地玩家 (假设 ID 为 0) 是否可以在该格子建塔
+        int32 LocalPlayerId = 0;
+        bool bCanBuild = GridSubsystem->CanBuildAt(LocalPlayerId, HoveredCoord);
+
+        // 5. 画一个 100x100cm 的绿色/红色方框 (绿表示可建，红表示非领地/已阻挡)
+        FColor BoxColor = bCanBuild ? FColor::Green : FColor::Red;
+
+        // FVector Extent 为半长宽高，100cm 的格子半长是 50cm，高度给 2cm 的薄片
+        DrawDebugBox(GetWorld(), TileCenter, FVector(50.0f, 50.0f, 2.0f), BoxColor, false, -1.0f, 0, 2.0f);
+    }
+}
+
+void ATWPlayerController::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+
+	NotifyPlayerStateReady();
+}
+
+void ATWPlayerController::InitPlayerState()
+{
+	Super::InitPlayerState();
+
+	NotifyPlayerStateReady();
+}
+
+void ATWPlayerController::RequestBuildTower(UTowerDataAsset* TowerData)
+{
+	if (!TowerData || !TowerData->TowerClass) return;
+
+	Server_RequestBuildTower(SelectedGridCoord, TowerData);
+}
+
+void ATWPlayerController::RequestUpgradeTower()
+{
+	Server_RequestUpgradeTower(SelectedGridCoord);
+}
+
+void ATWPlayerController::RequestSellTower()
+{
+	Server_RequestSellTower(SelectedGridCoord);
+}
+
+void ATWPlayerController::RequestSummonEnemy(UEnemyDataAsset* EnemyData)
+{
+	Server_RequestSummonEnemy(EnemyData);
+}
+
+void ATWPlayerController::BeginPlay()
+{
+    Super::BeginPlay();
+
+	HUD = Cast<ATWHUD>(GetHUD());
+
+	bShowMouseCursor = true;
+	FInputModeGameAndUI InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock); 
+	InputMode.SetHideCursorDuringCapture(false);                      
+	SetInputMode(InputMode);
+
+	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
+	{
+		if (DefaultMappingContext)
+		{
+			Subsystem->AddMappingContext(DefaultMappingContext, 0);
+		}
+	}
+}
+
+void ATWPlayerController::SetupInputComponent()
+{
+    Super::SetupInputComponent();
+
+    if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent))
+    {
+        EnhancedInputComponent->BindAction(ClickAction, ETriggerEvent::Started, this, &ThisClass::OnLeftClick);
+        EnhancedInputComponent->BindAction(SummonAction, ETriggerEvent::Started, this, &ThisClass::OnSummonClick);
+    }
+
+}
+
+void ATWPlayerController::OnLeftClick()
+{
+    UTWGridSubsystem* GridSubsystem = GetWorld()->GetSubsystem<UTWGridSubsystem>();
+    if (!GridSubsystem) return;
+
+    FHitResult HitResult;
+    GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
+
+    if(HitResult.bBlockingHit)
+    {
+		FIntPoint ClickedCoord = GridSubsystem->WorldToGridCoords(HitResult.ImpactPoint);
+        const FGridCell* Cell = GridSubsystem->GetCellData(ClickedCoord);
+
+		ATWPlayerState* PS = GetPlayerState<ATWPlayerState>();
+		int32 LocalPlayerId = PS ? PS->GetPlayerIndex() : -1;
+
+        if (Cell && Cell->OwnerPlayerId == LocalPlayerId)
+        {
+			SelectedGridCoord = ClickedCoord;
+
+            switch (Cell->CellType)
+            {
+            case EGridCellType::Empty:
+                // 1. 点击空地 -> 打开建造菜单
+				HUD->ShowBuildMenu();
+                break;
+
+            case EGridCellType::Built:
+                // 2. 点击已有塔 -> 打开升级/拆除菜单
+                if (Cell->PlacedTower.IsValid())
+                {
+                    HUD->ShowUpgradeMenu(Cell->PlacedTower->GetTowerData());
+                }
+                break;
+            }
+        }
+	}
+}
+
+void ATWPlayerController::OnSummonClick()
+{
+	HUD->ShowSummonMenu();
+}
+
+void ATWPlayerController::NotifyPlayerStateReady()
+{
+	if (IsLocalController() && HUD.IsValid())
+	{
+		if (UTWOverlay* Overlay = HUD->GetOverlayWidget())
+		{
+			Overlay->TryInitInfoMenu();
+		}
+	}
+
+	if (ATWPlayerState* PS = GetPlayerState<ATWPlayerState>())
+	{
+		OnPlayerStateReady.Broadcast(PS);
+	}
+}
+
+bool ATWPlayerController::Server_RequestSummonEnemy_Validate(UEnemyDataAsset* EnemyData)
+{
+	return true;
+}
+
+void ATWPlayerController::Server_RequestSummonEnemy_Implementation(UEnemyDataAsset* EnemyData)
+{
+	if (!EnemyData) return;
+
+	ATWPlayerState* PS = GetPlayerState<ATWPlayerState>();
+	ATWGameMode* GM = GetWorld()->GetAuthGameMode<ATWGameMode>();
+	if (!PS || !GM) return;
+
+	// 金币校验
+	const int32 CurrentStar = PS->GetEnemyStarLevel(EnemyData);
+	const int32 ActualCost = EnemyData->GetCostForStar(CurrentStar);
+	const int32 ActualIncome = EnemyData->GetIncomeForStar(CurrentStar);
+	if (PS->GetGold() < ActualCost) return;
+
+	// Stock校验
+	if (!PS->TryConsumeStock(EnemyData, 1)) return;
+
+	// 扣除金币，并增加玩家的 Income（收益）
+	PS->AddGold(-ActualCost);
+	PS->AddIncome(ActualIncome);
+
+	// 广播给其他所有人刷怪
+	const int32 MyPlayerIndex = PS->GetPlayerIndex();
+	GM->SummonEnemyToAllOthers(MyPlayerIndex, EnemyData);
+}
+
+void ATWPlayerController::Server_RequestSellTower_Implementation(FIntPoint GridCoord)
+{
+	UTWGridSubsystem* GridSubsystem = GetWorld()->GetSubsystem<UTWGridSubsystem>();
+	if (!GridSubsystem) return;
+
+	const FGridCell* Cell = GridSubsystem->GetCellData(GridCoord);
+	ATWPlayerState* PS = GetPlayerState<ATWPlayerState>();
+	if (!Cell || !PS) return;
+
+	if (Cell->OwnerPlayerId != PS->GetPlayerIndex() || Cell->CellType != EGridCellType::Built) return;
+
+	ATWTowerBase* Tower = Cell->PlacedTower.Get();
+	if (!IsValid(Tower) || !Tower->GetTowerData()) return;
+
+	PS->AddGold(Tower->GetTowerData()->Sell);
+
+	Tower->Destroy();
+
+	GridSubsystem->ReleaseCell(PS->GetPlayerIndex(), GridCoord);
+}
+
+bool ATWPlayerController::Server_RequestSellTower_Validate(FIntPoint GridCoord)
+{
+	return true;
+}
+
+void ATWPlayerController::Server_RequestUpgradeTower_Implementation(FIntPoint GridCoord)
+{
+}
+
+bool ATWPlayerController::Server_RequestUpgradeTower_Validate(FIntPoint GridCoord)
+{
+	return true;
+}
+
+void ATWPlayerController::Server_RequestBuildTower_Implementation(FIntPoint GridCoord, UTowerDataAsset* TowerData)
+{
+	if (!TowerData || !TowerData->TowerClass)
+	{
+		return;
+	}
+
+	// 校验 1：GridSubsystem 状态
+	UTWGridSubsystem* GridSubsystem = GetWorld()->GetSubsystem<UTWGridSubsystem>();
+	if (!GridSubsystem) return;
+
+	const FGridCell* Cell = GridSubsystem->GetCellData(GridCoord);
+	ATWPlayerState* PS = GetPlayerState<ATWPlayerState>();
+	if (!Cell || !PS) return;
+
+	// 校验 2：防作弊校验（地块归属 & 是否为空）
+	if (Cell->OwnerPlayerId != PS->GetPlayerIndex() || Cell->CellType != EGridCellType::Empty)
+	{
+		return;
+	}
+
+	// 校验 3：玩家金币是否足够 (Hypixel 规则)
+	if (PS->GetGold() < TowerData->Cost)
+	{
+		// 可发 RPC 通知客户端：金币不足
+		return;
+	}
+
+	// --- 执行建造 ---
+	// 1. 扣钱
+	PS->AddGold(-TowerData->Cost);
+
+	// 2. 获取生成世界坐标
+	FVector SpawnLoc = GridSubsystem->GridToWorldLocation(GridCoord);
+	FRotator SpawnRot = FRotator::ZeroRotator;
+
+	// 3. 生成防御塔 Actor
+	ATWTowerBase* NewTower = GetWorld()->SpawnActorDeferred<ATWTowerBase>(
+		TowerData->TowerClass,
+		FTransform(SpawnRot, SpawnLoc),
+		this,
+		nullptr,
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn
+	);
+
+	if (NewTower)
+	{
+		NewTower->OccupiedGridCoord = GridCoord;
+		NewTower->InitTower(TowerData, PS->GetPlayerIndex());
+		NewTower->FinishSpawning(FTransform(SpawnRot, SpawnLoc));
+
+		// 4. 更新服务端 GridSubsystem 中的网格状态（记录塔指针与类型）
+		GridSubsystem->OccupyCell(PS->GetPlayerIndex(), GridCoord, NewTower);
+	}
+}
+
+bool ATWPlayerController::Server_RequestBuildTower_Validate(FIntPoint GridCoord, UTowerDataAsset* TowerData)
+{
+	return TowerData != nullptr;
+}
