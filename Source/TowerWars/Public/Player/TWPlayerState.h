@@ -19,6 +19,9 @@ struct FEnemySummonInfo
 	UPROPERTY()
 	int32 TotalSummonedCount = 0;
 
+	UPROPERTY()
+	int32 StarLevel = 0;
+
 	bool operator==(const FEnemySummonInfo& Other) const
 	{
 		return EnemyData == Other.EnemyData;
@@ -51,12 +54,13 @@ public:
 	void AddGold(int32 Amount);
 	void AddHealth(int32 Amount);
 	void ReduceHealth(int32 Amount);
+	UFUNCTION(BlueprintCallable)
 	void AddIncome(int32 Amount);
 	void ApplyPeriodicIncome();
 	void SetPlayerIndex(int32 Index);
 	bool TryConsumeStock(UEnemyDataAsset* EnemyData, int32 Amount = 1);
 	int32 GetSummonedCountForEnemy(const UEnemyDataAsset* EnemyData) const;
-	int32 GetEnemyStarLevel(UEnemyDataAsset* EnemyData) const;
+	int32 GetEnemyStarLevel(const UEnemyDataAsset* EnemyData) const;
 
 	// 请求升级怪物星级（客户端发起）
 	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "TW|Enemy")

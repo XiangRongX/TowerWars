@@ -30,7 +30,7 @@ void USummonTooltip::SetStock(int32 NewStock)
 
 void USummonTooltip::SetSummoned(int32 NewSummoned)
 {
-	Text_Stock->SetText(FText::FromString(FString::Printf(TEXT("已召唤：%d"), NewSummoned)));
+	Text_Summoned->SetText(FText::FromString(FString::Printf(TEXT("已召唤：%d"), NewSummoned)));
 }
 
 void USummonTooltip::NativeConstruct()
@@ -47,8 +47,6 @@ void USummonTooltip::NativeConstruct()
 
 void USummonTooltip::NativeDestruct()
 {
-	Super::NativeDestruct();
-
 	if (ATWPlayerState* PS = GetOwningPlayerState<ATWPlayerState>())
 	{
 		PS->OnPlayerStockUpdated.RemoveAll(this);

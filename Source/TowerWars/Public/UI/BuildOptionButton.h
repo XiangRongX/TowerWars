@@ -27,7 +27,7 @@ public:
 	FOnBuildOptionClicked OnUpgradeOptionClicked;
 
 	void SetLocked(bool bLocked);
-	void InitUpgradeOption(UTowerDataAsset* Data);
+	void InitUpgradeOption(UTowerDataAsset* TargetData, UTowerDataAsset* CurrentData);
 
 	FORCEINLINE bool GetLocked() const { return bIsLocked; }
 	FORCEINLINE void SetBuild(bool bBuild) { bIsBuild = bBuild; }
@@ -62,5 +62,9 @@ private:
 	UFUNCTION()
 	void HandleGoldChanged(int32 NewGold);
 
+	UFUNCTION()
+	void HandleIncomeChanged(int32 NewIncome);
+
 	void UpdateAffordability(int32 CurrentGold);
+	void RefreshState();
 };

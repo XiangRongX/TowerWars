@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
+#include "UI/BuildTooltip.h"
 #include "UpgradeTooltip.generated.h"
 
 class UTowerDataAsset;
@@ -12,13 +12,14 @@ class UTowerDataAsset;
  * 
  */
 UCLASS()
-class TOWERWARS_API UUpgradeTooltip : public UUserWidget
+class TOWERWARS_API UUpgradeTooltip : public UBuildTooltip
 {
 	GENERATED_BODY()
 	
 public:
-	void SetTooltip(const UTowerDataAsset* Data);
+	void SetUpgradeTooltip(const UTowerDataAsset* CurrentData, const UTowerDataAsset* TargetData);
 
 protected:
-
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UTextBlock> Text_NewCost;
 };

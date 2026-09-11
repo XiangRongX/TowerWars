@@ -37,6 +37,9 @@ public:
 	int32 Cost;
 
 	UPROPERTY(EditDefaultsOnly)
+	int32 Sell;
+
+	UPROPERTY(EditDefaultsOnly)
 	int32 Level;
 
 	UPROPERTY(EditDefaultsOnly)

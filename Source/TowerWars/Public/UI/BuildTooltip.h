@@ -18,7 +18,7 @@ class TOWERWARS_API UBuildTooltip : public UUserWidget
 	GENERATED_BODY()
 	
 public:
-	void SetTooltip(const UTowerDataAsset* Data);
+	virtual void SetTooltip(const UTowerDataAsset* Data);
 
 protected:
 	UPROPERTY(meta = (BindWidget))
@@ -35,6 +35,9 @@ protected:
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> Text_Interval;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UTextBlock> Text_Cost;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> Text_Special;

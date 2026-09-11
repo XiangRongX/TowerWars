@@ -51,8 +51,11 @@ void ATWEnemyBase::OnEnemyDeath()
 			{
 				if (TWPS->GetPlayerIndex() == TargetPlayerIndex)
 				{
-					TWPS->AddGold(Cost / 6);
-					TWPS->AddIncome(Income / 6);
+					const int32 CurrentStar = TWPS->GetEnemyStarLevel(EnemyData.Get());
+					const int32 ActualCost = EnemyData->GetCostForStar(CurrentStar);
+					const int32 ActualIncome = EnemyData->GetIncomeForStar(CurrentStar);
+					TWPS->AddGold(FMath::RoundToInt(ActualCost * 0.17f));
+					TWPS->AddIncome(FMath::RoundToInt(ActualCost * 0.02f));
 					break;
 				}
 			}
@@ -150,9 +153,10 @@ void ATWEnemyBase::Tick(float DeltaTime)
 
 	DistanceAlongSpline += Speed * DeltaTime;
 
-	FVector CenterLocation = PathSpline->GetLocationAtDistanceAlongSpline(DistanceAlongSpline, ESplineCoordinateSpace::World);
-	FVector RightVector = PathSpline->GetRightVectorAtDistanceAlongSpline(DistanceAlongSpline, ESplineCoordinateSpace::World);
-	FRotator WorldRotation = PathSpline->GetRotationAtDistanceAlongSpline(DistanceAlongSpline, ESplineCoordinateSpace::World);
+	FTransform SplineTransform = PathSpline->GetTransformAtDistanceAlongSpline(DistanceAlongSpline, ESplineCoordinateSpace::World);
+	FVector CenterLocation = SplineTransform.GetLocation();
+	FRotator WorldRotation = SplineTransform.GetRotation().Rotator();
+	FVector RightVector = SplineTransform.GetRotation().GetRightVector();
 	FVector FinalLocation = CenterLocation + (RightVector * BaseLateralOffset);
 	SetActorLocationAndRotation(FinalLocation, WorldRotation);
 
@@ -191,7 +195,6 @@ float ATWEnemyBase::TakeDamage(float DamageAmount, FDamageEvent const& DamageEve
 	if (Health <= 0.0f)
 	{
 		OnEnemyDeath();
-		Destroy();
 	}
 
 	return ActualDamage;
@@ -212,6 +215,8 @@ void ATWEnemyBase::InitEnemy(const UEnemyDataAsset* Data, USplineComponent* Path
 		Speed = Data->Speed * 100;
 		Cost = Data->Cost;
 		Income = Data->Income;
+
+		EnemyData = Data;
 	}
 
 	BaseLateralOffset = FMath::FRandRange(-MaxLateralOffset, MaxLateralOffset);

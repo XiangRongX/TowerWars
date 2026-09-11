@@ -122,33 +122,61 @@ int32 ATWPlayerState::GetSummonedCountForEnemy(const UEnemyDataAsset* EnemyData)
 	return FoundInfo ? FoundInfo->TotalSummonedCount : 0;
 }
 
-int32 ATWPlayerState::GetEnemyStarLevel(UEnemyDataAsset* EnemyData) const
+int32 ATWPlayerState::GetEnemyStarLevel(const UEnemyDataAsset* EnemyData) const
 {
 	if (!EnemyData) return 0;
-	if (const int32* StarPtr = EnemyStarLevels.Find(EnemyData))
-	{
-		return *StarPtr;
-	}
-	return 0;
+
+	const FEnemySummonInfo* FoundInfo = SummonedEnemyList.FindByPredicate([EnemyData](const FEnemySummonInfo& Info) {
+		return Info.EnemyData == EnemyData;
+		});
+
+	return FoundInfo ? FoundInfo->StarLevel : 0;
 }
 
 void ATWPlayerState::Server_UpgradeEnemyStar_Implementation(UEnemyDataAsset* EnemyData)
 {
-	if (!EnemyData) return;
+	if (!HasAuthority() || !EnemyData) return;
 
-	int32 CurrentStar = GetEnemyStarLevel(EnemyData);
-	int32 TargetStar = CurrentStar + 1;
+	// 1. 如果传入的是基础怪物，且存在 NextUpgrade，代表请求从【基础怪物】升级为【升级怪物】
+	UEnemyDataAsset* TargetEnemy = EnemyData;
+	if (!EnemyData->bIsUpgradedEnemy)
+	{
+		if (!EnemyData->NextUpgrade) return;
+		TargetEnemy = EnemyData->NextUpgrade;
+	}
 
-	// 1. 检查星级上限
+	const int32 CurrentStar = GetEnemyStarLevel(TargetEnemy);
+	const int32 TargetStar = (EnemyData->bIsUpgradedEnemy) ? (CurrentStar + 1) : 0;
+
 	if (TargetStar > 5) return;
 
-	// 2. 校验玩家当前收入是否达到升星门槛
-	int32 RequiredIncome = EnemyData->GetStarIncomeRequirement(TargetStar);
+	// 2. 校验玩家 Income 是否达到升星/解锁要求
+	const int32 RequiredIncome = (TargetStar == 0)
+		? TargetEnemy->GetUnlockIncomeRequirement()
+		: TargetEnemy->GetStarIncomeRequirement(TargetStar);
+
 	if (Income < RequiredIncome) return;
 
-	// 3. 服务端更新数据并广播
-	EnemyStarLevels.FindOrAdd(EnemyData) = TargetStar;
-	OnEnemyStarUpgraded.Broadcast(EnemyData, TargetStar);
+	// 3. 更新 SummonedEnemyList（通过 Replicated 自动同步）
+	FEnemySummonInfo* FoundInfo = SummonedEnemyList.FindByPredicate([TargetEnemy](const FEnemySummonInfo& Info) {
+		return Info.EnemyData == TargetEnemy;
+		});
+
+	if (FoundInfo)
+	{
+		FoundInfo->StarLevel = TargetStar;
+	}
+	else
+	{
+		FEnemySummonInfo NewInfo;
+		NewInfo.EnemyData = TargetEnemy;
+		NewInfo.StarLevel = TargetStar;
+		SummonedEnemyList.Add(NewInfo);
+	}
+
+	// 4. 广播星级提升
+	OnEnemyStarUpgraded.Broadcast(TargetEnemy, TargetStar);
+	BroadcastStockUpdate(TargetEnemy);
 }
 
 void ATWPlayerState::BeginPlay()

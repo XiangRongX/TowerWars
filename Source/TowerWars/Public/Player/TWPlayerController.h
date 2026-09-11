@@ -34,7 +34,7 @@ public:
 	void RequestBuildTower(UTowerDataAsset* TowerData);
 
 	UFUNCTION(BlueprintCallable, Category = "TW|Build")
-	void RequestUpgradeTower();
+	void RequestUpgradeTower(UTowerDataAsset* TargetTowerData);
 
 	UFUNCTION(BlueprintCallable, Category = "TW|Build")
 	void RequestSellTower();
@@ -62,7 +62,7 @@ protected:
 	void Server_RequestBuildTower(FIntPoint GridCoord, UTowerDataAsset* TowerData);
 
 	UFUNCTION(Server, Reliable, WithValidation)
-	void Server_RequestUpgradeTower(FIntPoint GridCoord);
+	void Server_RequestUpgradeTower(FIntPoint GridCoord, UTowerDataAsset* TargetTowerData);
 
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_RequestSellTower(FIntPoint GridCoord);

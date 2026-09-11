@@ -37,11 +37,6 @@ void USellButton::InitSellButton(UTowerDataAsset* Data)
 		if (TooltipWidget)
 		{
 			TooltipWidget->SetTooltip(TowerData);
-
-			if (Button_Sell)
-			{
-				Button_Sell->SetToolTip(TooltipWidget);
-			}
 		}
 	}
 }

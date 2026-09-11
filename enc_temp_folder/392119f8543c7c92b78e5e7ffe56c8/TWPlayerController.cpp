@@ -216,7 +216,7 @@ void ATWPlayerController::Server_RequestSellTower_Implementation(FIntPoint GridC
 	ATWTowerBase* Tower = Cell->PlacedTower.Get();
 	if (!IsValid(Tower) || !Tower->GetTowerData()) return;
 
-	PS->AddGold(FMath::FloorToInt(Tower->GetTowerData()->Cost / 2.f));
+	PS->AddGold(Tower->GetTowerData()->Sell);
 
 	Tower->Destroy();
 

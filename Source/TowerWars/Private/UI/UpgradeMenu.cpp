@@ -20,15 +20,15 @@ void UUpgradeMenu::InitUpgradeMenu(UTowerDataAsset* TowerData)
 
 	case 1:
 		WBP_BuildOptionButton1->SetVisibility(ESlateVisibility::Visible);
-		WBP_BuildOptionButton1->InitUpgradeOption(TowerData->NextUpgrades[0]);
+		WBP_BuildOptionButton1->InitUpgradeOption(TowerData->NextUpgrades[0], TowerData);
 		WBP_BuildOptionButton2->SetVisibility(ESlateVisibility::Collapsed);
 		break;
 
 	case 2:
 		WBP_BuildOptionButton1->SetVisibility(ESlateVisibility::Visible);
-		WBP_BuildOptionButton1->InitUpgradeOption(TowerData->NextUpgrades[0]);
+		WBP_BuildOptionButton1->InitUpgradeOption(TowerData->NextUpgrades[0], TowerData);
 		WBP_BuildOptionButton2->SetVisibility(ESlateVisibility::Visible);
-		WBP_BuildOptionButton2->InitUpgradeOption(TowerData->NextUpgrades[1]);
+		WBP_BuildOptionButton2->InitUpgradeOption(TowerData->NextUpgrades[1], TowerData);
 		break;
 	}
 
@@ -41,11 +41,11 @@ void UUpgradeMenu::NativeOnInitialized()
 
 	if(WBP_BuildOptionButton1)
 	{
-		WBP_BuildOptionButton1->OnBuildOptionClicked.AddDynamic(this, &ThisClass::HandleTowerOptionSelected);
+		WBP_BuildOptionButton1->OnUpgradeOptionClicked.AddDynamic(this, &ThisClass::HandleTowerOptionSelected);
 	}
 	if(WBP_BuildOptionButton2)
 	{
-		WBP_BuildOptionButton2->OnBuildOptionClicked.AddDynamic(this, &ThisClass::HandleTowerOptionSelected);
+		WBP_BuildOptionButton2->OnUpgradeOptionClicked.AddDynamic(this, &ThisClass::HandleTowerOptionSelected);
 	}
 	if (WBP_SellButton)
 	{
@@ -60,7 +60,7 @@ void UUpgradeMenu::HandleTowerOptionSelected(UTowerDataAsset* SelectedTowerData)
 	ATWPlayerController* PC = GetOwningPlayer<ATWPlayerController>();
 	if (PC && PC->IsLocalController())
 	{
-		PC->RequestUpgradeTower();
+		PC->RequestUpgradeTower(SelectedTowerData);
 		FInputModeGameAndUI InputMode;
 		PC->SetInputMode(InputMode);
 	}

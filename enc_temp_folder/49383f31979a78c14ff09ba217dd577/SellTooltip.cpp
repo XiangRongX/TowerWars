@@ -8,5 +8,5 @@
 void USellTooltip::SetTooltip(const UTowerDataAsset* Data)
 {
 	Text_Name->SetText(FText::FromString(FString::Printf(TEXT("出售 %s %d级"), *Data->TowerName.ToString(), Data->Level)));
-	Text_Sell->SetText(FText::FromString(FString::Printf(TEXT("回收金额：%d"), FMath::FloorToInt(Data->Cost / 2.f))));
+	Text_Sell->SetText(FText::FromString(FString::Printf(TEXT("回收金额：%d"), Data->Sell)));
 }

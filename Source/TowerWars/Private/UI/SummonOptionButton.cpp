@@ -22,7 +22,7 @@ void USummonOptionButton::UpgradeEnemy()
 		USummonTooltip* TooltipWidget = CreateWidget<USummonTooltip>(GetOwningPlayer(), TooltipClass);
 		if (TooltipWidget)
 		{
-			//TooltipWidget->SetTooltip(EnemyData);
+			TooltipWidget->SetTooltip(EnemyData);
 			if (Button_Enemy)
 			{
 				Button_Enemy->SetToolTip(TooltipWidget);
@@ -120,18 +120,36 @@ void USummonOptionButton::UpdateAffordability()
 	ATWPlayerState* PS = GetOwningPlayerState<ATWPlayerState>();
 	if (!PS) return;
 
-	// 1. 校验金币是否足够
-	const bool bHasEnoughGold = (PS->GetGold() >= EnemyData->Cost);
+	const int32 CurrentIncome = PS->GetIncome();
+	const int32 CurrentStar = PS->GetEnemyStarLevel(EnemyData);
 
-	// 2. 校验 Stock 是否大于 0
+	// 1. 判定当前怪物形态是否解锁
+	bIsLocked = !EnemyData->IsUnlocked(CurrentIncome);
+
+	// 2. 如果当前是基础怪物，检查是否达到升级为【升级怪物】的条件
+	if (!EnemyData->bIsUpgradedEnemy && EnemyData->NextUpgrade)
+	{
+		if (EnemyData->NextUpgrade->IsUnlocked(CurrentIncome))
+		{
+			UpgradeEnemy();
+		}
+	}
+
+	// 3. 计算发兵性价比与可用状态
+	const int32 ActualCost = EnemyData->GetCostForStar(CurrentStar);
+	const bool bHasEnoughGold = (PS->GetGold() >= ActualCost);
 	const bool bHasEnoughStock = (PS->GetCurrentStock() > 0);
 
-	// 3. 综合判断：未锁定 && 金币足够 && Stock > 0
-	const bool bCanAfford = bHasEnoughGold && bHasEnoughStock && !bIsLocked;
+	const bool bCanAfford = !bIsLocked && bHasEnoughGold && bHasEnoughStock;
 
 	if (Button_Enemy)
 	{
 		Button_Enemy->SetIsEnabled(bCanAfford);
+	}
+
+	if (Image_Lock)
+	{
+		Image_Lock->SetVisibility(bIsLocked ? ESlateVisibility::Visible : ESlateVisibility::Hidden);
 	}
 }
 

@@ -94,4 +94,6 @@ private:
 
 	void RecalculateLocationFromNetwork();
 	void OnHealthChanged(float NewHealth, float DamageAmount);
+
+	TWeakObjectPtr<const UEnemyDataAsset> EnemyData;
 };
