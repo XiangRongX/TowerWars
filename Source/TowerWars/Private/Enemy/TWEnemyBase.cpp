@@ -9,6 +9,8 @@
 #include "GameFramework/GameStateBase.h"
 #include "Player/TWPlayerState.h"
 #include "Game/TWGameState.h"
+#include "Components/WidgetComponent.h"
+#include "UI/EnemyOverheadWidget.h"
 
 ATWEnemyBase::ATWEnemyBase()
 {
@@ -27,23 +29,54 @@ ATWEnemyBase::ATWEnemyBase()
 	EnemyMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("EnemyMesh"));
 	EnemyMesh->SetupAttachment(RootComponent);
 	EnemyMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	OverheadWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("OverheadWidget"));
+	OverheadWidgetComponent->SetupAttachment(RootComponent);
+	OverheadWidgetComponent->SetWidgetSpace(EWidgetSpace::Screen);
+	OverheadWidgetComponent->SetDrawAtDesiredSize(true);
+	OverheadWidgetComponent->SetRelativeLocation(FVector(0.0f, 0.0f, 120.0f));
 }
 
 void ATWEnemyBase::BeginPlay()
 {
 	Super::BeginPlay();
 	
+	if (OverheadWidgetComponent && OverheadWidgetClass)
+	{
+		OverheadWidgetComponent->SetWidgetClass(OverheadWidgetClass);
+		if (UEnemyOverheadWidget* Widget = Cast<UEnemyOverheadWidget>(OverheadWidgetComponent->GetUserWidgetObject()))
+		{
+			Widget->InitEnemy(this);
+		}
+	}
 }
 
 void ATWEnemyBase::OnHealthChanged(float NewHealth, float DamageAmount)
 {
+	if (OverheadWidgetComponent)
+	{
+		if (UEnemyOverheadWidget* Widget = Cast<UEnemyOverheadWidget>(OverheadWidgetComponent->GetUserWidgetObject()))
+		{
+			Widget->ShowAliveState();
+		}
+	}
+}
+
+void ATWEnemyBase::DestroyAfterDeathReward()
+{
+	Destroy();
 }
 
 void ATWEnemyBase::OnEnemyDeath()
 {
-	if (!HasAuthority()) return;
+	if (!HasAuthority() || bDeathHandled) return;
 
-	// 寻找跑道对应的玩家 PlayerState（假设 TargetPlayerIndex 已存）
+	bDeathHandled = true;
+
+	int32 GoldReward = 0;
+	int32 IncomeReward = 0;
+
+	// 寻找跑道对应的玩家 PlayerState
 	if (AGameStateBase* GS = GetWorld()->GetGameState())
 	{
 		for (APlayerState* PS : GS->PlayerArray)
@@ -55,20 +88,24 @@ void ATWEnemyBase::OnEnemyDeath()
 					const int32 CurrentStar = TWPS->GetEnemyStarLevel(EnemyData.Get());
 					const int32 ActualCost = EnemyData->GetCostForStar(CurrentStar);
 					const int32 ActualIncome = EnemyData->GetIncomeForStar(CurrentStar);
-					TWPS->AddGold(FMath::RoundToInt(ActualCost * 0.17f));
-					TWPS->AddIncome(FMath::RoundToInt(ActualCost * 0.02f));
+					GoldReward = FMath::RoundToInt(ActualCost * 0.17f);
+					IncomeReward = FMath::RoundToInt(ActualIncome * 0.02f);
+					TWPS->AddGold(GoldReward);
+					TWPS->AddIncome(IncomeReward);
 					break;
 				}
 			}
 		}
 	}
 
-	Destroy();
+	Multicast_ShowDeathReward(GoldReward, IncomeReward);
+
+	GetWorldTimerManager().SetTimer(DeathDestroyTimerHandle, this, &ATWEnemyBase::DestroyAfterDeathReward, 2.0f, false);
 }
 
 void ATWEnemyBase::HandleReachedGoal()
 {
-	if (!HasAuthority()) return;
+	if (!HasAuthority() || !IsAlive()) return;
 
 	ATWPlayerState* TargetPS = nullptr;
 
@@ -112,17 +149,29 @@ void ATWEnemyBase::OnRep_PathSpline()
 void ATWEnemyBase::OnRep_Health(float OldHealth)
 {
 	float DamageTaken = OldHealth - Health;
-	//OnHealthChanged(Health, DamageTaken);
 
-	if (Health <= 0.0f)
+	if (Health > 0.0f)
 	{
-		OnEnemyDeath();
+		OnHealthChanged(Health, DamageTaken);
 	}
 }
 
 void ATWEnemyBase::OnRep_Speed()
 {
 	RecalculateLocationFromNetwork();
+}
+
+void ATWEnemyBase::Multicast_ShowDeathReward_Implementation(int32 GoldReward, int32 IncomeReward)
+{
+	EnemyMesh->SetVisibility(false, true);
+	HitCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	if (!OverheadWidgetComponent) return;
+
+	if (UEnemyOverheadWidget* Widget = Cast<UEnemyOverheadWidget>(OverheadWidgetComponent->GetUserWidgetObject()))
+	{
+		Widget->ShowDeathReward(GoldReward, IncomeReward);
+	}
 }
 
 void ATWEnemyBase::RecalculateLocationFromNetwork()
@@ -150,7 +199,7 @@ void ATWEnemyBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (!PathSpline) return;
+	if (!PathSpline || !IsAlive()) return;
 
 	DistanceAlongSpline += Speed * DeltaTime;
 
@@ -179,23 +228,25 @@ void ATWEnemyBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(ATWEnemyBase, BaseLateralOffset);
 	DOREPLIFETIME(ATWEnemyBase, ServerSpawnTime);
 	DOREPLIFETIME(ATWEnemyBase, SummonerPlayerState);
+	DOREPLIFETIME(ATWEnemyBase, bDeathHandled);
 }
 
 float ATWEnemyBase::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
-	if (!HasAuthority() || Health <= 0.0f) return 0.0f;
+	if (!HasAuthority() || Health <= 0.0f || bDeathHandled) return 0.0f;
 
 	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 	ActualDamage = FMath::Min(Health, ActualDamage);
 
 	Health -= ActualDamage;
 
-	// 服务器端本地触发表现（用于监听事件）
-	//OnHealthChanged(Health, ActualDamage);
-
 	if (Health <= 0.0f)
 	{
 		OnEnemyDeath();
+	}
+	else
+	{
+		OnHealthChanged(Health, ActualDamage);
 	}
 
 	return ActualDamage;

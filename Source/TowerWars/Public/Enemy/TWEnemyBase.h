@@ -10,6 +10,8 @@ class USphereComponent;
 class USplineComponent;
 class UEnemyDataAsset;
 class ATWPlayerState;
+class UWidgetComponent;
+class UEnemyOverheadWidget;
 
 UCLASS()
 class TOWERWARS_API ATWEnemyBase : public AActor
@@ -43,6 +45,12 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "TW|Enemy")
 	TObjectPtr<USkeletalMeshComponent> EnemyMesh;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "TW|UI")
+	TObjectPtr<UWidgetComponent> OverheadWidgetComponent;
+
+	UPROPERTY(EditDefaultsOnly, Category = "TW|UI")
+	TSubclassOf<UEnemyOverheadWidget> OverheadWidgetClass;
 
 	UPROPERTY(EditDefaultsOnly, Category = "TW|Enemy")
 	float MaxLateralOffset = 100.0f;
@@ -92,8 +100,17 @@ private:
 	UFUNCTION()
 	void OnRep_Speed();
 
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_ShowDeathReward(int32 GoldReward, int32 IncomeReward);
+
 	void RecalculateLocationFromNetwork();
 	void OnHealthChanged(float NewHealth, float DamageAmount);
 
 	TWeakObjectPtr<const UEnemyDataAsset> EnemyData;
+
+	FTimerHandle DeathDestroyTimerHandle;
+	void DestroyAfterDeathReward();
+
+	UPROPERTY(Replicated)
+	bool bDeathHandled = false;
 };

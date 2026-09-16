@@ -113,6 +113,7 @@ ATWEnemyBase* ATWTowerBase::SelectBestTarget(const TArray<ATWEnemyBase*>& Candid
 	for (int32 i = 1; i < CandidateEnemies.Num(); ++i)
 	{
 		ATWEnemyBase* Curr = CandidateEnemies[i];
+		if (!Curr->IsAlive()) continue;
 
 		switch (TargetStrategy)
 		{
