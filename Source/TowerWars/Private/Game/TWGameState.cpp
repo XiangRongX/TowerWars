@@ -17,6 +17,7 @@ void ATWGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(ATWGameState, TargetTotalPlayers);
 	DOREPLIFETIME(ATWGameState, MatchTimeRemaining);
 	DOREPLIFETIME(ATWGameState, IncomeTimeRemaining);
+	DOREPLIFETIME(ATWGameState, EnemyHealthMultiplier);
 }
 
 void ATWGameState::BeginPlay()
@@ -25,13 +26,7 @@ void ATWGameState::BeginPlay()
 
 	if (HasAuthority())
 	{
-		GetWorldTimerManager().SetTimer(
-			SecondTickTimerHandle,
-			this,
-			&ATWGameState::OnSecondTick,
-			1.0f,
-			true
-		);
+		GetWorldTimerManager().SetTimer(SecondTickTimerHandle, this, &ATWGameState::OnSecondTick, 1.0f,	true);
 	}
 }
 
@@ -55,6 +50,11 @@ void ATWGameState::OnRep_IncomeTimeRemaining()
 	OnIncomeTimerUpdated.Broadcast(IncomeTimeRemaining);
 }
 
+void ATWGameState::OnRep_EnemyHealthMultiplier()
+{
+	OnEnemyHealthMultiplierChanged.Broadcast(EnemyHealthMultiplier);
+}
+
 void ATWGameState::OnSecondTick()
 {
 	if (!HasAuthority()) return;
@@ -72,6 +72,19 @@ void ATWGameState::OnSecondTick()
 		IncomeTimeRemaining = 10;
 	}
 	OnRep_IncomeTimeRemaining();
+
+	// 每秒累计一次怪物血量倍率计时
+	EnemyHealthScaleElapsedSeconds++;
+	if (EnemyHealthScaleElapsedSeconds >= EnemyHealthScaleInterval)
+	{
+		EnemyHealthScaleElapsedSeconds = 0;
+
+		// 每 150 秒提升至当前倍率的 1.13 倍
+		EnemyHealthMultiplier *= EnemyHealthScaleFactor;
+
+		// 服务端本地立即通知
+		OnRep_EnemyHealthMultiplier();
+	}
 }
 
 void ATWGameState::DistributePeriodicIncome()

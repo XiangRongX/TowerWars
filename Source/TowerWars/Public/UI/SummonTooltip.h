@@ -58,7 +58,11 @@ private:
 
 	// 收到 Stock/Summoned 广播时的回调
 	void HandleStockUpdated(int32 CurrentStock, int32 MaxStock, const UEnemyDataAsset* UpdatedEnemyData);
+	// 全局怪物血量倍率变化回调
+	void HandleEnemyHealthMultiplierChanged(float NewMultiplier);
 
 	// 刷新全局/个人 Stock 与 Summoned 数值
 	void RefreshStockAndSummoned();
+	// 刷新当前 Tooltip 显示的怪物最大血量
+	void RefreshEnemyHealth();
 };

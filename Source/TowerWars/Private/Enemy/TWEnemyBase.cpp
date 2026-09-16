@@ -8,6 +8,7 @@
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/GameStateBase.h"
 #include "Player/TWPlayerState.h"
+#include "Game/TWGameState.h"
 
 ATWEnemyBase::ATWEnemyBase()
 {
@@ -210,7 +211,13 @@ void ATWEnemyBase::InitEnemy(const UEnemyDataAsset* Data, USplineComponent* Path
 
 	if (Data)
 	{
-		MaxHealth = Data->Health;
+		float CurrentHealthMultiplier = 1.0f;
+		if (ATWGameState* GS = GetWorld()->GetGameState<ATWGameState>())
+		{
+			CurrentHealthMultiplier = GS->GetEnemyHealthMultiplier();
+		}
+		MaxHealth = Data->Health * CurrentHealthMultiplier;
+
 		Health = MaxHealth;
 		Speed = Data->Speed * 100;
 		Cost = Data->Cost;

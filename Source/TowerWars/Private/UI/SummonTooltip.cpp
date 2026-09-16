@@ -5,6 +5,7 @@
 #include "Data/EnemyDataAsset.h"
 #include "Components/TextBlock.h"
 #include "Player/TWPlayerState.h"
+#include "Game/TWGameState.h"
 
 void USummonTooltip::SetTooltip(const UEnemyDataAsset* Data)
 {
@@ -21,6 +22,7 @@ void USummonTooltip::SetTooltip(const UEnemyDataAsset* Data)
 	Text_Special->SetText(FText::FromString(FString::Printf(TEXT("特殊：%s"), *Data->Special.ToString())));
 
 	RefreshStockAndSummoned();
+	RefreshEnemyHealth();
 }
 
 void USummonTooltip::SetStock(int32 NewStock)
@@ -41,8 +43,13 @@ void USummonTooltip::NativeConstruct()
 	{
 		PS->OnPlayerStockUpdated.AddUObject(this, &ThisClass::HandleStockUpdated);
 	}
+	if (ATWGameState* GS = GetWorld()->GetGameState<ATWGameState>())
+	{
+		GS->OnEnemyHealthMultiplierChanged.AddUObject(this, &ThisClass::HandleEnemyHealthMultiplierChanged);
+	}
 
 	RefreshStockAndSummoned();
+	RefreshEnemyHealth();
 }
 
 void USummonTooltip::NativeDestruct()
@@ -50,6 +57,10 @@ void USummonTooltip::NativeDestruct()
 	if (ATWPlayerState* PS = GetOwningPlayerState<ATWPlayerState>())
 	{
 		PS->OnPlayerStockUpdated.RemoveAll(this);
+	}
+	if (ATWGameState* GS = GetWorld()->GetGameState<ATWGameState>())
+	{
+		GS->OnEnemyHealthMultiplierChanged.RemoveAll(this);
 	}
 
 	Super::NativeDestruct();
@@ -71,6 +82,11 @@ void USummonTooltip::HandleStockUpdated(int32 CurrentStock, int32 MaxStock, cons
 	}
 }
 
+void USummonTooltip::HandleEnemyHealthMultiplierChanged(float NewMultiplier)
+{
+	RefreshEnemyHealth();
+}
+
 void USummonTooltip::RefreshStockAndSummoned()
 {
 	if (ATWPlayerState* PS = GetOwningPlayerState<ATWPlayerState>())
@@ -82,4 +98,20 @@ void USummonTooltip::RefreshStockAndSummoned()
 			SetSummoned(PS->GetSummonedCountForEnemy(BoundEnemyData.Get()));
 		}
 	}
+}
+
+void USummonTooltip::RefreshEnemyHealth()
+{
+	if (!BoundEnemyData.IsValid()) return;
+
+	float HealthMultiplier = 1.0f;
+
+	if (ATWGameState* GS = GetWorld()->GetGameState<ATWGameState>())
+	{
+		HealthMultiplier = GS->GetEnemyHealthMultiplier();
+	}
+
+	const float NewMaxHealth = BoundEnemyData->Health * HealthMultiplier;
+
+	Text_Health->SetText(FText::FromString(FString::Printf(TEXT("血量：%.0f"), NewMaxHealth)));
 }
