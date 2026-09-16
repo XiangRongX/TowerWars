@@ -23,6 +23,7 @@ public:
 	void SummonEnemyToAllOthers(int32 SenderPlayerIndex, const UEnemyDataAsset* EnemyData);
 	void InitializeSpawnersForPlayers(int32 ActivePlayerCount);
 	ATWPlayerState* GetPlayerStateByPlayerIndex(int32 TargetPlayerIndex) const;
+	void HandlePlayerEliminated(ATWPlayerState* EliminatedPlayer);
 	
 protected:
 	virtual void BeginPlay() override;
@@ -35,4 +36,5 @@ private:
 	TMap<int32, AEnemySpawner*> EnemySpawnerMap;
 	TMap<int32, AEnemySpawner*> ActiveSpawnerMap;
 
+	void CheckLastPlayerStanding();
 };

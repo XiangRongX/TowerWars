@@ -4,6 +4,7 @@
 #include "Player/TWPlayerState.h"
 #include "Net/UnrealNetwork.h"
 #include "Data/EnemyDataAsset.h"
+#include "Game/TWGameMode.h"
 
 ATWPlayerState::ATWPlayerState()
 {
@@ -42,15 +43,17 @@ void ATWPlayerState::AddHealth(int32 Amount)
 
 void ATWPlayerState::ReduceHealth(int32 Amount)
 {
-	if (!HasAuthority() || Amount <= 0) return;
+	if (!HasAuthority() || Amount <= 0 || PlayerHealth <= 0) return;
 
 	PlayerHealth = FMath::Max(0, PlayerHealth - Amount);
 	OnHealthChanged.Broadcast(PlayerIndex, PlayerHealth);
 
 	if(PlayerHealth <= 0)
 	{
-		// 玩家血量为 0，触发游戏结束逻辑
-		// 可以在这里广播一个事件，或者调用游戏模式的相关方法
+		if (ATWGameMode* GM = GetWorld()->GetAuthGameMode<ATWGameMode>())
+		{
+			GM->HandlePlayerEliminated(this);
+		}
 	}
 }
 

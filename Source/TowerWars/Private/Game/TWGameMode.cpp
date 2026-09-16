@@ -29,11 +29,11 @@ void ATWGameMode::SummonEnemyToAllOthers(int32 SenderPlayerIndex, const UEnemyDa
 		const int32 TargetPlayerIndex = Pair.Key;
 		AEnemySpawner* TargetSpawner = Pair.Value;
 
-		UE_LOG(LogTemp, Log, TEXT("SummonEnemyToAllOthers: Sender=%d  Iterating Target=%d  Spawner=%s  IsValid=%d"),
+		/*UE_LOG(LogTemp, Log, TEXT("SummonEnemyToAllOthers: Sender=%d  Iterating Target=%d  Spawner=%s  IsValid=%d"),
 			SenderPlayerIndex,
 			TargetPlayerIndex,
 			*GetNameSafe(TargetSpawner),
-			IsValid(TargetSpawner) ? 1 : 0);
+			IsValid(TargetSpawner) ? 1 : 0);*/
 
 		if (TargetPlayerIndex != SenderPlayerIndex && IsValid(TargetSpawner))
 		{
@@ -161,6 +161,44 @@ void ATWGameMode::PostLogin(APlayerController* NewPlayer)
 			UE_LOG(LogTemp, Log, TEXT("玩家已满 (%d/%d)，开始分配跑道与 Spawner！"), GetNumPlayers(), GS->TargetTotalPlayers);
 			InitializeSpawnersForPlayers(GS->TargetTotalPlayers);
 		}
+	}
+}
+
+void ATWGameMode::HandlePlayerEliminated(ATWPlayerState* EliminatedPlayer)
+{
+	if (!EliminatedPlayer) return;
+
+	ATWGameState* GS = GetGameState<ATWGameState>();
+	if (!GS || GS->IsGameOver()) return;
+
+	UE_LOG(LogTemp, Log, TEXT("玩家 %d 被淘汰"), EliminatedPlayer->GetPlayerIndex());
+
+	CheckLastPlayerStanding();
+}
+
+void ATWGameMode::CheckLastPlayerStanding()
+{
+	ATWGameState* GS = GetGameState<ATWGameState>();
+	if (!GS || GS->IsGameOver()) return;
+
+	TArray<int32> AlivePlayerIndices;
+	for (APlayerState* PS : GameState->PlayerArray)
+	{
+		if (ATWPlayerState* TWPS = Cast<ATWPlayerState>(PS))
+		{
+			if (TWPS->GetPlayerHealth() > 0)
+			{
+				AlivePlayerIndices.Add(TWPS->GetPlayerIndex());
+			}
+		}
+	}
+
+	// 只剩最后一个存活玩家
+	if (AlivePlayerIndices.Num() == 1)
+	{
+		UE_LOG(LogTemp, Log, TEXT("只剩最后一名玩家存活，PlayerIndex=%d 获胜"), AlivePlayerIndices[0]);
+
+		GS->EndGameWithWinners(AlivePlayerIndices);
 	}
 }
 

@@ -14,7 +14,6 @@ void ATWHUD::ShowBuildMenu()
 		BuildMenuWidget->SetVisibility(ESlateVisibility::Visible);
 
 		FInputModeUIOnly InputMode;
-		InputMode.SetWidgetToFocus(BuildMenuWidget->TakeWidget());
 		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 		GetOwningPlayerController()->SetInputMode(InputMode);
 	}
@@ -28,7 +27,6 @@ void ATWHUD::ShowUpgradeMenu(UTowerDataAsset* TowerData)
 		UpgradeMenuWidget->InitUpgradeMenu(TowerData);
 
 		FInputModeUIOnly InputMode;
-		InputMode.SetWidgetToFocus(UpgradeMenuWidget->TakeWidget());
 		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 		GetOwningPlayerController()->SetInputMode(InputMode);
 	}
@@ -41,7 +39,6 @@ void ATWHUD::ShowSummonMenu()
 		SummonMenuWidget->SetVisibility(ESlateVisibility::Visible);
 
 		FInputModeUIOnly InputMode;
-		InputMode.SetWidgetToFocus(SummonMenuWidget->TakeWidget());
 		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 		GetOwningPlayerController()->SetInputMode(InputMode);
 	}

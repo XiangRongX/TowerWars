@@ -18,6 +18,20 @@ void ATWGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(ATWGameState, MatchTimeRemaining);
 	DOREPLIFETIME(ATWGameState, IncomeTimeRemaining);
 	DOREPLIFETIME(ATWGameState, EnemyHealthMultiplier);
+	DOREPLIFETIME(ATWGameState, bGameOver);
+	DOREPLIFETIME(ATWGameState, WinnerPlayerIndices);
+}
+
+void ATWGameState::EndGameWithWinners(const TArray<int32>& InWinnerPlayerIndices)
+{
+	if (!HasAuthority() || bGameOver) return;
+
+	WinnerPlayerIndices = InWinnerPlayerIndices;
+	bGameOver = true;
+
+	GetWorldTimerManager().ClearTimer(SecondTickTimerHandle);
+
+	BroadcastGameEnded();
 }
 
 void ATWGameState::BeginPlay()
@@ -55,16 +69,26 @@ void ATWGameState::OnRep_EnemyHealthMultiplier()
 	OnEnemyHealthMultiplierChanged.Broadcast(EnemyHealthMultiplier);
 }
 
+void ATWGameState::OnRep_GameOver()
+{
+	if (bGameOver)
+	{
+		OnGameEnded.Broadcast(WinnerPlayerIndices);
+	}
+}
+
 void ATWGameState::OnSecondTick()
 {
-	if (!HasAuthority()) return;
+	if (!HasAuthority() || bGameOver) return;
 
+	// 比赛时间
 	if (MatchTimeRemaining > 0)
 	{
 		MatchTimeRemaining--;
 		OnRep_MatchTimeRemaining(); 
 	}
 
+	// 收入
 	IncomeTimeRemaining--;
 	if (IncomeTimeRemaining <= 0)
 	{
@@ -85,15 +109,75 @@ void ATWGameState::OnSecondTick()
 		// 服务端本地立即通知
 		OnRep_EnemyHealthMultiplier();
 	}
+
+	// 比赛结束
+	if (MatchTimeRemaining <= 0)
+	{
+		DetermineWinnersByHealth();
+	}
 }
 
 void ATWGameState::DistributePeriodicIncome()
 {
+	if (bGameOver) return;
+
 	for (APlayerState* PS : PlayerArray)
 	{
 		if (ATWPlayerState* TWPS = Cast<ATWPlayerState>(PS))
 		{
-			TWPS->ApplyPeriodicIncome();
+			if (TWPS->GetPlayerHealth() > 0)
+			{
+				TWPS->ApplyPeriodicIncome();
+			}
 		}
 	}
+}
+
+void ATWGameState::DetermineWinnersByHealth()
+{
+	if (!HasAuthority() || bGameOver) return;
+
+	// 找到最高血量
+	int32 HighestHealth = -1;
+	for (APlayerState* PS : PlayerArray)
+	{
+		if (ATWPlayerState* TWPS = Cast<ATWPlayerState>(PS))
+		{
+			const int32 Health = TWPS->GetPlayerHealth();
+
+			// 血量为 0 的玩家已经淘汰，不参与胜负
+			if (Health > 0)
+			{
+				HighestHealth = FMath::Max(HighestHealth, Health);
+			}
+		}
+	}
+
+	// 收集所有最高血量玩家
+	WinnerPlayerIndices.Reset();
+	if (HighestHealth >= 0)
+	{
+		for (APlayerState* PS : PlayerArray)
+		{
+			if (ATWPlayerState* TWPS = Cast<ATWPlayerState>(PS))
+			{
+				if (TWPS->GetPlayerHealth() > 0 &&
+					TWPS->GetPlayerHealth() == HighestHealth)
+				{
+					WinnerPlayerIndices.Add(TWPS->GetPlayerIndex());
+				}
+			}
+		}
+	}
+
+	bGameOver = true;
+
+	GetWorldTimerManager().ClearTimer(SecondTickTimerHandle);
+
+	BroadcastGameEnded();
+}
+
+void ATWGameState::BroadcastGameEnded()
+{
+	OnGameEnded.Broadcast(WinnerPlayerIndices);
 }
