@@ -15,10 +15,37 @@ void UTWGridSubsystem::InitializePlayerGrid(int32 PlayerId, FIntPoint StartCoord
 			FGridCell Cell;
 			Cell.GridCoords = Coord;
 			Cell.OwnerPlayerId = PlayerId;
-			Cell.CellType = EGridCellType::Empty;
+			Cell.CellType = EGridCellType::Blocked;
 
 			GridCells.Add(Coord, Cell);
 		}
+	}
+}
+
+void UTWGridSubsystem::SetCellType(const FIntPoint& GridCoords, EGridCellType CellType)
+{
+	FGridCell* Cell = GridCells.Find(GridCoords);
+	if (!Cell) return;
+
+	Cell->CellType = CellType;
+
+	if (CellType != EGridCellType::Built)
+	{
+		Cell->PlacedTower = nullptr;
+	}
+}
+
+void UTWGridSubsystem::SetBuildableCells(int32 PlayerId, const TArray<FIntPoint>& BlockedCells)
+{
+	for (const FIntPoint& Coord : BlockedCells)
+	{
+		FGridCell* Cell = GridCells.Find(Coord);
+
+		if (!Cell) continue;
+		if (Cell->OwnerPlayerId != PlayerId) continue;
+
+		Cell->CellType = EGridCellType::Buildable;
+		Cell->PlacedTower = nullptr;
 	}
 }
 
@@ -45,7 +72,7 @@ bool UTWGridSubsystem::CanBuildAt(int32 PlayerId, const FIntPoint& GridCoords) c
 	}
 
 	// 必须是自己的领地，且必须是空地
-	return (Cell->OwnerPlayerId == PlayerId) && (Cell->CellType == EGridCellType::Empty);
+	return (Cell->OwnerPlayerId == PlayerId) && (Cell->CellType == EGridCellType::Buildable);
 }
 
 bool UTWGridSubsystem::OccupyCell(int32 PlayerId, const FIntPoint& GridCoords, ATWTowerBase* Tower)
@@ -69,10 +96,27 @@ const FGridCell* UTWGridSubsystem::GetCellData(const FIntPoint& GridCoords) cons
 
 bool UTWGridSubsystem::ReleaseCell(int32 PlayerId, const FIntPoint& GridCoords)
 {
-	FGridCell& Cell = GridCells[GridCoords];
-	Cell.CellType = EGridCellType::Empty;
-	Cell.PlacedTower = nullptr;
+	FGridCell* Cell = GridCells.Find(GridCoords);
+
+	if (!Cell) return false;
+	if (Cell->OwnerPlayerId != PlayerId) return false;
+	if (Cell->CellType != EGridCellType::Built) return false;
+
+	Cell->CellType = EGridCellType::Buildable;
+	Cell->PlacedTower = nullptr;
 
 	return true;
+}
+
+EGridCellType UTWGridSubsystem::GetCellType(const FIntPoint& GridCoords) const
+{
+	const FGridCell* Cell = GridCells.Find(GridCoords);
+
+	if (!Cell)
+	{
+		return EGridCellType::Blocked;
+	}
+
+	return Cell->CellType;
 }
 

@@ -19,3 +19,11 @@ enum class ETowerDamageType : uint8
 	SingleTarget  UMETA(DisplayName = "单体即时"),
 	AreaOfEffect  UMETA(DisplayName = "范围即时 (AoE)")
 };
+
+UENUM(BlueprintType)
+enum class EGridCellType : uint8
+{
+	Buildable	UMETA(DisplayName = "可建造"),
+	Built		UMETA(DisplayName = "已建造"),
+	Blocked		UMETA(DisplayName = "不可建造")
+};

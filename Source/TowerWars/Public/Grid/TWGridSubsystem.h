@@ -4,18 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
+#include "Type/TWType.h"
 #include "TWGridSubsystem.generated.h"
 
 class ATWTowerBase;
-
-UENUM(BlueprintType)
-enum class EGridCellType :uint8
-{
-	Empty,
-	Built,
-	Blocked,
-	Path
-};
 
 USTRUCT(BlueprintType)
 struct FGridCell
@@ -26,10 +18,10 @@ struct FGridCell
 	FIntPoint GridCoords = FIntPoint::ZeroValue;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 OwnerPlayerId = -1;
+	int32 OwnerPlayerId = INDEX_NONE;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	EGridCellType CellType = EGridCellType::Empty;
+	EGridCellType CellType = EGridCellType::Blocked;
 
 	TWeakObjectPtr<ATWTowerBase> PlacedTower = nullptr;
 };
@@ -52,6 +44,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "TW|Grid")
 	void InitializePlayerGrid(int32 PlayerId, FIntPoint StartCoord, FIntPoint GridSize);
 
+	void SetCellType(const FIntPoint& GridCoords, EGridCellType CellType);
+	void SetBuildableCells(int32 PlayerId, const TArray<FIntPoint>& BlockedCells);
+
 	UFUNCTION(BlueprintCallable, Category = "TW|Grid")
 	FIntPoint WorldToGridCoords(const FVector& WorldLocation) const;
 
@@ -66,6 +61,7 @@ public:
 
 	const FGridCell* GetCellData(const FIntPoint& GridCoords) const;
 	bool ReleaseCell(int32 PlayerId, const FIntPoint& GridCoords);
+	EGridCellType GetCellType(const FIntPoint& GridCoords) const;
 
 private:
 	TMap<FIntPoint, FGridCell> GridCells;

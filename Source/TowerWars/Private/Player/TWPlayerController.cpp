@@ -20,6 +20,10 @@ void ATWPlayerController::PlayerTick(float DeltaTime)
     UTWGridSubsystem* GridSubsystem = GetWorld()->GetSubsystem<UTWGridSubsystem>();
     if (!GridSubsystem) return;
 
+	ATWPlayerState* PS = GetPlayerState<ATWPlayerState>();
+	const int32 LocalPlayerId =	PS ? PS->GetPlayerIndex() : -1;
+	if (LocalPlayerId < 0) return;
+
     // 2. 鼠标射线检测地面
     FHitResult HitResult;
     GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
@@ -30,15 +34,40 @@ void ATWPlayerController::PlayerTick(float DeltaTime)
         FIntPoint HoveredCoord = GridSubsystem->WorldToGridCoords(HitResult.ImpactPoint);
         FVector TileCenter = GridSubsystem->GridToWorldLocation(HoveredCoord);
 
-        // 4. 判定本地玩家 (假设 ID 为 0) 是否可以在该格子建塔
-        int32 LocalPlayerId = 0;
-        bool bCanBuild = GridSubsystem->CanBuildAt(LocalPlayerId, HoveredCoord);
+		const FGridCell* Cell = GridSubsystem->GetCellData(HoveredCoord);
+		FColor BoxColor = FColor::Red;
+		if (Cell)
+		{
+			if (Cell->OwnerPlayerId != LocalPlayerId)
+			{
+				// 别人的区域
+				BoxColor = FColor::Red;
+			}
+			else
+			{
+				switch (Cell->CellType)
+				{
+				case EGridCellType::Buildable:
+					// 可以建塔
+					BoxColor = FColor::Green;
+					break;
 
-        // 5. 画一个 100x100cm 的绿色/红色方框 (绿表示可建，红表示非领地/已阻挡)
-        FColor BoxColor = bCanBuild ? FColor::Green : FColor::Red;
+				case EGridCellType::Built:
+					// 已有塔
+					BoxColor = FColor::Yellow;
+					break;
 
-        // FVector Extent 为半长宽高，100cm 的格子半长是 50cm，高度给 2cm 的薄片
-        DrawDebugBox(GetWorld(), TileCenter, FVector(50.0f, 50.0f, 2.0f), BoxColor, false, -1.0f, 0, 2.0f);
+				case EGridCellType::Blocked:
+					// 禁止建造
+					BoxColor = FColor::Red;
+					break;
+				default:
+					BoxColor = FColor::Red;
+					break;
+				}
+			}
+		}
+		DrawDebugBox(GetWorld(), TileCenter, FVector(50.f, 50.f, 2.f), BoxColor, false, -1.f, 0, 3.f);
     }
 }
 
@@ -133,7 +162,7 @@ void ATWPlayerController::OnLeftClick()
 
             switch (Cell->CellType)
             {
-            case EGridCellType::Empty:
+            case EGridCellType::Buildable:
                 // 1. 点击空地 -> 打开建造菜单
 				HUD->ShowBuildMenu();
                 break;
@@ -318,7 +347,7 @@ void ATWPlayerController::Server_RequestBuildTower_Implementation(FIntPoint Grid
 	if (!Cell || !PS) return;
 
 	// 校验 2：防作弊校验（地块归属 & 是否为空）
-	if (Cell->OwnerPlayerId != PS->GetPlayerIndex() || Cell->CellType != EGridCellType::Empty)
+	if (Cell->OwnerPlayerId != PS->GetPlayerIndex() || Cell->CellType != EGridCellType::Buildable)
 	{
 		return;
 	}

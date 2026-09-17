@@ -111,11 +111,11 @@ void ATWGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (UTWGridSubsystem* GridSubsystem = GetWorld()->GetSubsystem<UTWGridSubsystem>())
-	{
-		GridSubsystem->InitializePlayerGrid(0, FIntPoint(0, 0), FIntPoint(20, 30));
-		GridSubsystem->InitializePlayerGrid(1, FIntPoint(25, 0), FIntPoint(20, 30));
-	}
+	//if (UTWGridSubsystem* GridSubsystem = GetWorld()->GetSubsystem<UTWGridSubsystem>())
+	//{
+	//	GridSubsystem->InitializePlayerGrid(0, FIntPoint(0, 0), FIntPoint(20, 30));
+	//	GridSubsystem->InitializePlayerGrid(1, FIntPoint(25, 0), FIntPoint(20, 30));
+	//}
 
 	for (TActorIterator<AEnemySpawner> It(GetWorld()); It; ++It)
 	{
