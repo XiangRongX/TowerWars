@@ -53,25 +53,25 @@ void AEnemySpawner::BeginPlay()
 
 void AEnemySpawner::ProcessSpawnQueue()
 {
-	if (!HasAuthority() || SpawnQueue.Num() == 0 || !TargetPathActor) return;
+	if (!HasAuthority() || SpawnQueue.Num() == 0) return;
+
+	// 第一层：选择路线类型
+	const FEnemyRouteType* SelectedRouteType = SelectRandomRouteType();
+	if (!SelectedRouteType) return;
+
+	// 第二层：选择该路线类型下的具体完整 Path
+	APathActor* SelectedPath = SelectRandomPath(*SelectedRouteType);
+	if (!SelectedPath) return;
+
+	USplineComponent* SplineComp = SelectedPath->GetSplineComponent();
+	if (!SplineComp) return;
 
 	FEnemySpawnRequest Request = SpawnQueue[0];
 	SpawnQueue.RemoveAt(0);
 
-	USplineComponent* SplineComp = TargetPathActor->GetSplineComponent();
-	if (!SplineComp) return;
-
 	FVector SpawnLoc = SplineComp->GetLocationAtDistanceAlongSpline(0.0f, ESplineCoordinateSpace::World);
 	FRotator SpawnRot = SplineComp->GetRotationAtDistanceAlongSpline(0.0f, ESplineCoordinateSpace::World);
-
-	ATWEnemyBase* NewEnemy = GetWorld()->SpawnActorDeferred<ATWEnemyBase>(
-		Request.EnemyData->EnemyClass,
-		FTransform(SpawnRot, SpawnLoc),
-		this,
-		nullptr,
-		ESpawnActorCollisionHandlingMethod::AlwaysSpawn
-	);
-
+	ATWEnemyBase* NewEnemy = GetWorld()->SpawnActorDeferred<ATWEnemyBase>(Request.EnemyData->EnemyClass, FTransform(SpawnRot, SpawnLoc), this, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 	if (NewEnemy)
 	{
 		NewEnemy->InitEnemy(Request.EnemyData, SplineComp, OwnerPlayerIndex);
@@ -80,4 +80,70 @@ void AEnemySpawner::ProcessSpawnQueue()
 	}
 }
 
+const FEnemyRouteType* AEnemySpawner::SelectRandomRouteType() const
+{
+	TArray<const FEnemyRouteType*> ValidRouteTypes;
 
+	for (const FEnemyRouteType& RouteType : RouteTypes)
+	{
+		if (RouteType.Weight <= 0.0f) continue;
+
+		bool bHasValidPath = false;
+		for (APathActor* Path : RouteType.Paths)
+		{
+			if (IsValid(Path) && Path->GetSplineComponent())
+			{
+				bHasValidPath = true;
+				break;
+			}
+		}
+
+		if (bHasValidPath)
+		{
+			ValidRouteTypes.Add(&RouteType);
+		}
+	}
+
+	if (ValidRouteTypes.Num() == 0) return nullptr;
+
+	float TotalWeight = 0.0f;
+	for (const FEnemyRouteType* RouteType : ValidRouteTypes)
+	{
+		TotalWeight += RouteType->Weight;
+	}
+
+	float RandomValue = FMath::FRandRange(0.0f, TotalWeight);
+	for (const FEnemyRouteType* RouteType : ValidRouteTypes)
+	{
+		RandomValue -= RouteType->Weight;
+
+		if (RandomValue <= 0.0f)
+		{
+			return RouteType;
+		}
+	}
+
+	return ValidRouteTypes.Last();
+}
+
+APathActor* AEnemySpawner::SelectRandomPath(const FEnemyRouteType& RouteType) const
+{
+	TArray<APathActor*> ValidPaths;
+
+	for (APathActor* Path : RouteType.Paths)
+	{
+		if (!IsValid(Path)) continue;
+		if (!Path->GetSplineComponent()) continue;
+
+		ValidPaths.Add(Path);
+	}
+
+	if (ValidPaths.Num() == 0)
+	{
+		return nullptr;
+	}
+
+	const int32 RandomIndex = FMath::RandRange(0, ValidPaths.Num() - 1);
+
+	return ValidPaths[RandomIndex];
+}
