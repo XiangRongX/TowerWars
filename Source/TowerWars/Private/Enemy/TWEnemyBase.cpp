@@ -103,6 +103,16 @@ void ATWEnemyBase::OnEnemyDeath()
 	GetWorldTimerManager().SetTimer(DeathDestroyTimerHandle, this, &ATWEnemyBase::DestroyAfterDeathReward, 2.0f, false);
 }
 
+void ATWEnemyBase::RefreshOverheadWidget()
+{
+	if (!OverheadWidgetComponent) return;
+
+	if (UEnemyOverheadWidget* Widget = Cast<UEnemyOverheadWidget>(OverheadWidgetComponent->GetUserWidgetObject()))
+	{
+		Widget->ShowAliveState();
+	}
+}
+
 void ATWEnemyBase::HandleReachedGoal()
 {
 	if (!HasAuthority() || !IsAlive()) return;
@@ -163,6 +173,7 @@ void ATWEnemyBase::OnRep_Speed()
 
 void ATWEnemyBase::Multicast_ShowDeathReward_Implementation(int32 GoldReward, int32 IncomeReward)
 {
+	SetActorTickEnabled(false);
 	EnemyMesh->SetVisibility(false, true);
 	HitCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
@@ -284,5 +295,11 @@ void ATWEnemyBase::InitEnemy(const UEnemyDataAsset* Data, USplineComponent* Path
 		ServerSpawnTime = GS->GetServerWorldTimeSeconds();
 	}
 	RecalculateLocationFromNetwork();
+}
+
+void ATWEnemyBase::SetSummonerPlayerState(ATWPlayerState* InSummoner)
+{
+	SummonerPlayerState = InSummoner;
+	RefreshOverheadWidget();
 }
 

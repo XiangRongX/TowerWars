@@ -25,13 +25,13 @@ public:
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 
 	virtual void InitEnemy(const UEnemyDataAsset* Data, USplineComponent* Path, int32 InTargetPlayerIndex);
+	void SetSummonerPlayerState(ATWPlayerState* InSummoner);
 
 	FORCEINLINE float GetDistanceAlongSpline() const { return DistanceAlongSpline; }
 	FORCEINLINE bool IsAlive() const { return Health > 0.f; }
 	FORCEINLINE float GetHealth() const { return Health; }
 	FORCEINLINE float GetMaxHealth() const { return MaxHealth; }
 	FORCEINLINE int32 GetTargetPlayerIndex() const { return TargetPlayerIndex; }
-	FORCEINLINE void SetSummonerPlayerState(ATWPlayerState* InSummoner) { SummonerPlayerState = InSummoner; }
 	FORCEINLINE ATWPlayerState* GetSummonerPlayerState() const { return SummonerPlayerState.Get(); }
 
 protected:
@@ -39,6 +39,7 @@ protected:
 
 	virtual void HandleReachedGoal();
 	virtual void OnEnemyDeath();
+	void RefreshOverheadWidget();
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "TW|Enemy")
 	TObjectPtr<USphereComponent> HitCollision;
