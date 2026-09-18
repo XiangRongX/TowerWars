@@ -9,6 +9,8 @@
 
 class UTowerDataAsset;
 class ATWEnemyBase;
+class UWidgetComponent;
+class UTowerOverheadWidget;
 
 UCLASS()
 class TOWERWARS_API ATWTowerBase : public AActor
@@ -21,6 +23,7 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	virtual void InitTower(UTowerDataAsset* Data, int32 PlayerIndex);
+	void RefreshOverheadWidget();
 
 	FORCEINLINE int32 GetOwnerPlayerIndex() const { return OwnerPlayerIndex; }
 	FORCEINLINE UTowerDataAsset* GetTowerData() const { return TowerData; }
@@ -36,6 +39,12 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, Category = "TW|Components")
 	TObjectPtr<UStaticMeshComponent> TowerMesh;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "TW|UI")
+	TObjectPtr<UWidgetComponent> OverheadWidgetComponent;
+
+	UPROPERTY(EditDefaultsOnly, Category = "TW|UI")
+	TSubclassOf<UTowerOverheadWidget> OverheadWidgetClass;
 
 	UPROPERTY(Replicated, VisibleInstanceOnly, Category = "TW|Debug")
 	TObjectPtr<ATWEnemyBase> CurrentTarget;

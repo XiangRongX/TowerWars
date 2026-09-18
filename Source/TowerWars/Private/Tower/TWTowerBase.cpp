@@ -7,6 +7,8 @@
 #include "Engine/OverlapResult.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
+#include "Components/WidgetComponent.h"
+#include "UI/TowerOverheadWidget.h"
 
 ATWTowerBase::ATWTowerBase()
 {
@@ -20,12 +22,27 @@ ATWTowerBase::ATWTowerBase()
 
 	TowerMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TowerMesh"));
 	TowerMesh->SetupAttachment(RootComponent);
+
+	OverheadWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("OverheadWidget"));
+	OverheadWidgetComponent->SetupAttachment(RootComponent);
+	OverheadWidgetComponent->SetWidgetSpace(EWidgetSpace::Screen);
+	OverheadWidgetComponent->SetDrawAtDesiredSize(true);
+	OverheadWidgetComponent->SetRelativeLocation(FVector(0.0f, 0.0f, 250.0f));
 }
 
 void ATWTowerBase::BeginPlay()
 {
 	Super::BeginPlay();
 	
+	if (OverheadWidgetComponent && OverheadWidgetClass)
+	{
+		OverheadWidgetComponent->SetWidgetClass(OverheadWidgetClass);
+
+		if (UTowerOverheadWidget* Widget = Cast<UTowerOverheadWidget>(OverheadWidgetComponent->GetUserWidgetObject()))
+		{
+			Widget->InitTower(this);
+		}
+	}
 }
 
 void ATWTowerBase::Tick(float DeltaTime)
@@ -56,6 +73,7 @@ void ATWTowerBase::InitTower(UTowerDataAsset* Data, int32 PlayerIndex)
 	if (!HasAuthority() || !Data) return;
 
 	TowerData = Data;
+	OwnerPlayerIndex = PlayerIndex;
 
 	Damage = Data->Damage;
 	AttackRange = Data->AttackRange * 100.0f;
@@ -66,6 +84,8 @@ void ATWTowerBase::InitTower(UTowerDataAsset* Data, int32 PlayerIndex)
 
 	GetWorldTimerManager().ClearTimer(AttackTimerHandle);
 	GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &ATWTowerBase::CheckAndAttack, AttackInterval, true);
+
+	RefreshOverheadWidget();
 }
 
 void ATWTowerBase::CheckAndAttack()
@@ -229,3 +249,13 @@ void ATWTowerBase::AcquireTargets(TArray<ATWEnemyBase*>& OutTargets)
 	}
 }
 
+void ATWTowerBase::RefreshOverheadWidget()
+{
+	if (OverheadWidgetComponent)
+	{
+		if (UTowerOverheadWidget* Widget = Cast<UTowerOverheadWidget>(OverheadWidgetComponent->GetUserWidgetObject()))
+		{
+			Widget->Refresh();
+		}
+	}
+}
